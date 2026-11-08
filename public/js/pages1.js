@@ -148,19 +148,21 @@ pageRegister('ads', {
       <div id="tbl" class="gap"></div>
       <div id="bar" class="bar hidden"></div>`;
     let all = []; let withT = false;
+    const sum = (rows, k) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+    const ratio = (a, b, m = 1) => (b > 0 ? (a / b) * m : null);
     const cols = () => [
       { k: 'title', t: 'Title', cls: 'wrap', html: (r) => `<b>${esc(r.title)}</b><div class="muted small">#${r.ad_id}${r.is_paused ? ' · paused' : ''}</div>` },
       { k: 'status', t: 'Status', html: (r) => stBadge(r.status) },
       ...(withT ? [{ k: 'target_summary', t: 'Target', cls: 'wrap' }] : []),
-      { k: 'views', t: 'Views', num: true }, { k: 'clicks', t: 'Clicks', num: true }, { k: 'actions', t: 'Actions', num: true },
-      { k: 'ctr', t: 'CTR', num: true, html: (r) => pct(r.ctr) }, { k: 'cvr', t: 'CVR', num: true, html: (r) => pct(r.cvr) },
-      { k: 'cpm', t: 'CPM', num: true, html: (r) => money(r.cpm, 2) }, { k: 'cpc', t: 'CPC', num: true, html: (r) => money(r.cpc, 4) },
-      { k: 'cpa', t: 'CPA', num: true, html: (r) => money(r.cpa, 3) }, { k: 'spent_budget', t: 'Spent', num: true, html: (r) => money(r.spent_budget) },
-      { k: 'remaining_budget', t: 'Left', num: true, html: (r) => money(r.remaining_budget) }, { k: 'daily_budget_limit', t: 'Daily cap', num: true, html: (r) => (r.daily_budget_limit ? money(r.daily_budget_limit) : '–') },
+      { k: 'views', t: 'Views', num: true, total: (R) => sum(R, 'views') }, { k: 'clicks', t: 'Clicks', num: true, total: (R) => sum(R, 'clicks') }, { k: 'actions', t: 'Actions', num: true, total: (R) => sum(R, 'actions') },
+      { k: 'ctr', t: 'CTR', num: true, html: (r) => pct(r.ctr), total: (R) => ratio(sum(R, 'clicks'), sum(R, 'views'), 100), totalHtml: pct }, { k: 'cvr', t: 'CVR', num: true, html: (r) => pct(r.cvr), total: (R) => ratio(sum(R, 'actions'), sum(R, 'clicks'), 100), totalHtml: pct },
+      { k: 'cpm', t: 'CPM', num: true, html: (r) => money(r.cpm, 2) }, { k: 'cpc', t: 'CPC', num: true, html: (r) => money(r.cpc, 4), total: (R) => ratio(sum(R, 'spent_budget'), sum(R, 'clicks')), totalHtml: (v) => money(v, 4) },
+      { k: 'cpa', t: 'CPA', num: true, html: (r) => money(r.cpa, 3), total: (R) => ratio(sum(R, 'spent_budget'), sum(R, 'actions')), totalHtml: (v) => money(v, 3) }, { k: 'spent_budget', t: 'Spent', num: true, html: (r) => money(r.spent_budget), total: (R) => sum(R, 'spent_budget'), totalHtml: (v) => money(v) },
+      { k: 'remaining_budget', t: 'Left', num: true, html: (r) => money(r.remaining_budget), total: (R) => sum(R, 'remaining_budget'), totalHtml: (v) => money(v) }, { k: 'daily_budget_limit', t: 'Daily cap', num: true, html: (r) => (r.daily_budget_limit ? money(r.daily_budget_limit) : '–') },
       { k: 'created_date', t: 'Created', html: (r) => esc(dt(r.created_date)) },
     ];
     let table;
-    const build = () => { table = dataTable($('#tbl', view), { cols: cols(), rowKey: 'ad_id', selectable: true, sortKey: 'created_date', onRow: (r) => openAd(r.ad_id), onSelect: renderBar, empty: 'No ads match.' }); applyFilter(); };
+    const build = () => { table = dataTable($('#tbl', view), { cols: cols(), rowKey: 'ad_id', selectable: true, sortKey: 'created_date', onRow: (r) => openAd(r.ad_id), onSelect: renderBar, empty: 'No ads match.', filters: true, totals: true }); applyFilter(); };
     function applyFilter() {
       const q = $('#q', view).value.trim().toLowerCase(); const st = $('#stf', view).value;
       table.set(all.filter((a) => (!st || a.status === st) && (!q || `${a.title} ${a.promote_url} ${a.text}`.toLowerCase().includes(q))));

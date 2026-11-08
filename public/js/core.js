@@ -113,16 +113,43 @@ async function busy(btn, fn) {
 
 // ---------- sortable, selectable table ----------
 /**
- * cols: [{k, t, num?, html?: row=>safeHtml, val?: row=>sortValue, cls?}]
+ * cols: [{k, t, num?, html?: row=>safeHtml, val?: row=>sortValue, cls?, nofilter?, total?: rows=>value, totalHtml?: v=>html}]
+ * filters: true adds a filter input under every header; totals: true adds a footer row for filtered rows
  * Returns {set(rows), selected(): rows[], el}
  */
-function dataTable(host, { cols, rowKey, selectable = false, onRow, onSelect, empty = 'Nothing here yet.', sortKey, sortDir = 'desc', rowClass }) {
-  const st = { rows: [], sortKey, dir: sortDir, sel: new Set() };
-  host.innerHTML = '<div class="tablewrap"><table><thead></thead><tbody></tbody></table></div>';
-  const thead = $('thead', host); const tbody = $('tbody', host);
+function dataTable(host, { cols, rowKey, selectable = false, onRow, onSelect, empty = 'Nothing here yet.', sortKey, sortDir = 'desc', rowClass, filters = false, totals = false }) {
+  const st = { rows: [], sortKey, dir: sortDir, sel: new Set(), flt: {} };
+  host.innerHTML = `${filters ? '<div class="fltbar"><span class="muted small" data-count></span><span class="grow"></span><span class="muted small">Number filters: <code>&gt;100</code> <code>&lt;=1.5</code> <code>10-50</code> <code>=0</code> · combine with a space: <code>&gt;1 &lt;3</code></span><button class="btn sm hidden" data-clear>✕ Clear filters</button></div>' : ''}<div class="tablewrap"><table><thead></thead><tbody></tbody>${totals ? '<tfoot></tfoot>' : ''}</table></div>`;
+  const thead = $('thead', host); const tbody = $('tbody', host); const tfoot = $('tfoot', host);
   const cell = (c, r) => (c.html ? c.html(r) : esc(c.num ? nf(r[c.k], c.d ?? 0) : r[c.k]));
+  const plain = (h) => String(h).replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").toLowerCase();
+  const numVal = (c, r) => { const v = c.val ? c.val(r) : r[c.k]; return v === null || v === undefined || v === '' ? null : Number(v); };
+  // "> 100", "<=1.5", "10-50", "=0", "100" (= at least 100); several parts separated by spaces must all hold
+  function numTest(expr) {
+    const parts = expr.replace(/,/g, '.').replace(/(>=|<=|>|<|=)\s+/g, '$1').trim().split(/\s+/).filter(Boolean);
+    const tests = parts.map((t) => {
+      let m = t.match(/^(-?\d*\.?\d+)-(-?\d*\.?\d+)$/);
+      if (m) { const a = +m[1]; const b = +m[2]; return (v) => v >= Math.min(a, b) && v <= Math.max(a, b); }
+      m = t.match(/^(>=|<=|>|<|=)?(-?\d*\.?\d+)%?$/);
+      if (!m) return null;
+      const n = +m[2];
+      return { '>': (v) => v > n, '<': (v) => v < n, '>=': (v) => v >= n, '<=': (v) => v <= n, '=': (v) => v === n }[m[1] || '>='];
+    });
+    if (!tests.length || tests.some((t) => !t)) return null; // invalid -> ignored (input turns red)
+    return (v) => v !== null && !Number.isNaN(v) && tests.every((t) => t(v));
+  }
+  function filtered() {
+    const active = cols.map((c) => [c, (st.flt[c.k] || '').trim()]).filter(([, f]) => f);
+    if (!active.length) return st.rows.slice();
+    const checks = active.map(([c, f]) => {
+      if (c.num) { const t = numTest(f); return t ? (r) => t(numVal(c, r)) : null; }
+      const words = f.toLowerCase().split(/\s+/);
+      return (r) => { const txt = plain(cell(c, r)); return words.every((w) => (w.startsWith('!') ? !txt.includes(w.slice(1)) : txt.includes(w))); };
+    }).filter(Boolean);
+    return st.rows.filter((r) => checks.every((ch) => ch(r)));
+  }
   function sorted() {
-    const rows = st.rows.slice();
+    const rows = filtered();
     const col = cols.find((c) => c.k === st.sortKey);
     if (!col) return rows;
     const val = (r) => { const v = col.val ? col.val(r) : r[col.k]; return v === null || v === undefined ? (st.dir === 'asc' ? Infinity : -Infinity) : v; };
@@ -130,15 +157,26 @@ function dataTable(host, { cols, rowKey, selectable = false, onRow, onSelect, em
     return rows;
   }
   function draw() {
-    thead.innerHTML = `<tr>${selectable ? '<th><input type="checkbox" data-all></th>' : ''}${cols.map((c) => `<th class="${c.num ? 'num' : ''}" data-k="${esc(c.k)}">${esc(c.t)}${st.sortKey === c.k ? (st.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr>`;
+    const head = `<tr class="hd">${selectable ? '<th><input type="checkbox" data-all></th>' : ''}${cols.map((c) => `<th class="${c.num ? 'num' : ''}" data-k="${esc(c.k)}">${esc(c.t)}${st.sortKey === c.k ? (st.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr>`;
+    if (!filters) thead.innerHTML = head;
+    else if (!$('tr.flt', thead)) { // filter row is built once so inputs keep focus while typing
+      thead.innerHTML = `${head}<tr class="flt">${selectable ? '<th></th>' : ''}${cols.map((c) => `<th class="${c.num ? 'num' : ''}">${c.nofilter ? '' : `<input type="text" data-f="${esc(c.k)}" placeholder="${c.num ? '>0' : 'filter'}" title="${c.num ? 'e.g. >100, <=1.5, 10-50, =0. A bare number means at least that.' : 'Text contains… (several words = all must match; !word = exclude)'}" value="${esc(st.flt[c.k] || '')}">`}</th>`).join('')}</tr>`;
+      $$('[data-f]', thead).forEach((inp) => { inp.oninput = () => { st.flt[inp.dataset.f] = inp.value; const c = cols.find((x) => x.k === inp.dataset.f); inp.classList.toggle('badf', !!(c && c.num && inp.value.trim() && !numTest(inp.value))); draw(); }; inp.onclick = (e) => e.stopPropagation(); });
+    } else $('tr.hd', thead).outerHTML = head;
     const rows = sorted();
+    if (filters) {
+      const n = Object.values(st.flt).filter((v) => v && v.trim()).length;
+      $('[data-count]', host).textContent = n ? `Showing ${rows.length} of ${st.rows.length} · ${n} filter${n > 1 ? 's' : ''} on` : `${st.rows.length} rows`;
+      const cb = $('[data-clear]', host); cb.classList.toggle('hidden', !n); cb.onclick = () => { st.flt = {}; $$('[data-f]', thead).forEach((i) => { i.value = ''; i.classList.remove('badf'); }); draw(); };
+    }
+    if (tfoot) tfoot.innerHTML = rows.length ? `<tr>${selectable ? '<td></td>' : ''}${cols.map((c, i) => { const v = typeof c.total === 'function' ? c.total(rows) : null; return `<td class="${c.num ? 'num' : ''}">${i === 0 ? `<b>Total · ${rows.length}</b>` : v === null || v === undefined ? '' : `<b>${c.totalHtml ? c.totalHtml(v) : esc(nf(v, c.d ?? 0))}</b>`}</td>`; }).join('')}</tr>` : '';
     tbody.innerHTML = rows.length ? rows.map((r) => {
       const id = rowKey ? r[rowKey] : '';
       return `<tr data-id="${esc(id)}" class="${onRow ? 'click' : ''} ${st.sel.has(String(id)) ? 'sel' : ''} ${rowClass ? esc(rowClass(r)) : ''}">${selectable ? `<td><input type="checkbox" data-sel ${st.sel.has(String(id)) ? 'checked' : ''}></td>` : ''}${cols.map((c) => `<td class="${c.num ? 'num' : ''} ${c.cls || ''}">${cell(c, r)}</td>`).join('')}</tr>`;
     }).join('') : `<tr><td colspan="${cols.length + (selectable ? 1 : 0)}" class="muted" style="padding:22px;text-align:center">${esc(empty)}</td></tr>`;
     const all = $('[data-all]', thead);
     if (all) { all.checked = rows.length > 0 && rows.every((r) => st.sel.has(String(r[rowKey]))); all.onchange = () => { rows.forEach((r) => (all.checked ? st.sel.add(String(r[rowKey])) : st.sel.delete(String(r[rowKey])))); draw(); onSelect && onSelect(api2.selected()); }; }
-    $$('th[data-k]', thead).forEach((th) => { th.onclick = () => { const k = th.dataset.k; if (st.sortKey === k) st.dir = st.dir === 'asc' ? 'desc' : 'asc'; else { st.sortKey = k; st.dir = 'desc'; } draw(); }; });
+    $$('tr.hd th[data-k], tr:first-child th[data-k]', thead).forEach((th) => { th.onclick = () => { const k = th.dataset.k; if (st.sortKey === k) st.dir = st.dir === 'asc' ? 'desc' : 'asc'; else { st.sortKey = k; st.dir = 'desc'; } draw(); }; });
     $$('tr[data-id]', tbody).forEach((tr) => {
       const id = tr.dataset.id;
       const cb = $('[data-sel]', tr);
@@ -152,6 +190,7 @@ function dataTable(host, { cols, rowKey, selectable = false, onRow, onSelect, em
     selected() { return st.rows.filter((r) => st.sel.has(String(r[rowKey]))); },
     clearSelection() { st.sel.clear(); draw(); onSelect && onSelect([]); },
     rows() { return sorted(); },
+    allRows() { return st.rows.slice(); },
   };
   draw();
   return api2;

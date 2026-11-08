@@ -109,3 +109,12 @@ canvas.chart { width: 100%; height: 280px; display: block; }
   .app { grid-template-columns: 1fr; } .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; } #nav { display: flex; flex-wrap: wrap; } .brand { padding-bottom: 6px; }
   .g2, .g3, .g4 { grid-template-columns: 1fr; } .form-grid .span2 { grid-column: auto; } .view { padding: 14px; }
 }
+
+/* column filters + totals */
+.fltbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.fltbar code { font-family: var(--mono); font-size: 11px; background: var(--panel2); padding: 1px 5px; border-radius: 4px; }
+tr.flt th { top: 33px; padding: 4px 6px; cursor: default; background: var(--panel); }
+tr.flt input { width: 100%; min-width: 56px; padding: 4px 6px; font-size: 12px; border-radius: 6px; }
+tr.flt th.num input { text-align: right; }
+tr.flt input.badf { border-color: var(--bad); outline-color: var(--bad); }
+tfoot td { position: sticky; bottom: 0; background: var(--panel2); border-top: 2px solid var(--line); }
