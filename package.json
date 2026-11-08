@@ -1,0 +1,19 @@
+{
+  "name": "telegram-ads-agent",
+  "version": "1.0.0",
+  "description": "Web app to manage Telegram Ads (promoteapi.telegram.org): bulk create, batch testing, stats, auto rules, alerts, Google Sheets.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test/run.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

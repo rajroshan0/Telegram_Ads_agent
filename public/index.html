@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Telegram Ads Agent</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232a9de6'/%3E%3Cpath d='M7 16l17-7-3 15-5-4-3 3v-5z' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="login" class="login hidden">
+    <form id="loginForm" class="card login-card">
+      <h1>Telegram Ads Agent</h1>
+      <p class="muted">Enter the app password to continue.</p>
+      <input type="password" id="loginPw" placeholder="Password" autocomplete="current-password" autofocus>
+      <button class="btn primary" type="submit">Sign in</button>
+      <div id="loginErr" class="err"></div>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="side">
+      <div class="brand"><span class="logo">✈</span><span>Ads Agent</span></div>
+      <nav id="nav"></nav>
+      <div class="side-foot"><span id="envBadge" class="badge"></span></div>
+    </aside>
+    <main class="main">
+      <header class="top">
+        <div id="pageTitle" class="page-title"></div>
+        <div class="top-right">
+          <label class="muted small" for="acctSel">Account</label>
+          <select id="acctSel"><option value="">Default</option></select>
+          <span id="balance" class="pill"></span>
+        </div>
+      </header>
+      <section id="view" class="view"></section>
+    </main>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="toasts" class="toasts"></div>
+
+  <script src="/js/core.js"></script>
+  <script src="/js/pages1.js"></script>
+  <script src="/js/pages2.js"></script>
+  <script src="/js/pages3.js"></script>
+  <script src="/js/boot.js"></script>
+</body>
+</html>
